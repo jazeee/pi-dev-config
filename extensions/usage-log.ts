@@ -19,6 +19,14 @@ let baselineHash: string | undefined;
 let lastLogAtMs = 0;
 let userEmail: string | undefined;
 
+type Announce = ExtensionContext | "console";
+
+function log(message: string, to: Announce): void {
+  debug(message);
+  if (to !== "console" && to.hasUI) to.ui.notify(`usage-log: ${message}`, "info");
+  else console.log(`usage-log: ${message}`);
+}
+
 function debug(message: string): void {
   if (process.env.PI_HOOK_DEBUG !== "1") return;
   const line = `[${new Date().toISOString()}] ${message}\n`;
@@ -31,7 +39,7 @@ function debug(message: string): void {
 
 async function git(cwd: string, args: string[]): Promise<string | undefined> {
   try {
-    const { stdout } = await run("git", ["-C", cwd, ...args]);
+    const { stdout } = await run("git", ["-C", cwd, ...args], { timeout: SEND_TIMEOUT_MS });
     return stdout.trim();
   } catch {
     return undefined;
@@ -92,7 +100,7 @@ async function resolveUserEmail(): Promise<string> {
     "list",
     "--filter=status:ACTIVE",
     "--format=value(account)",
-  ]).catch(() => ({ stdout: "" }));
+  ], { timeout: SEND_TIMEOUT_MS }).catch(() => ({ stdout: "" }));
   userEmail = stdout.split("\n")[0]?.trim() || "unknown";
   return userEmail;
 }
@@ -129,7 +137,7 @@ async function writeCloudLog(payload: Record<string, unknown>): Promise<void> {
   const { stdout: token } = await run(
     "gcloud",
     ["auth", "application-default", "print-access-token"],
-    { env: { ...process.env, GOOGLE_APPLICATION_CREDENTIALS: adcFile } }
+    { env: { ...process.env, GOOGLE_APPLICATION_CREDENTIALS: adcFile }, timeout: SEND_TIMEOUT_MS }
   );
 
   const dir = await mkdtemp(join(tmpdir(), "pi-usage-"));
@@ -155,11 +163,17 @@ async function writeCloudLog(payload: Record<string, unknown>): Promise<void> {
   }
 }
 
-async function report(eventType: "heartbeat" | "session_end", ctx: ExtensionContext): Promise<void> {
+async function report(
+  eventType: "heartbeat" | "session_end",
+  ctx: ExtensionContext,
+  announce?: Announce
+): Promise<void> {
   const usage = collectUsage(ctx);
   const totalTokens = usage.inputTokens + usage.outputTokens;
   if (totalTokens === 0) {
-    debug(`no ${PROVIDER_ID} usage — skipping ${eventType}`);
+    const message = `no ${PROVIDER_ID} usage — skipping ${eventType}`;
+    if (announce) log(message, announce);
+    else debug(message);
     return;
   }
 
@@ -181,10 +195,12 @@ async function report(eventType: "heartbeat" | "session_end", ctx: ExtensionCont
     ...(await gitMetadata(cwd)),
   };
 
-  debug(`sending ${eventType}: model=${usage.model} tokens=${totalTokens}`);
+  const summary = `${eventType}: model=${usage.model} tokens=${totalTokens}`;
+  debug(`sending ${summary}`);
   await writeCloudLog(payload);
   lastLogAtMs = Date.now();
-  debug(`${eventType} sent`);
+  if (announce) log(`sent ${summary}`, announce);
+  else debug(`${eventType} sent`);
 }
 
 export default function (pi: ExtensionAPI) {
@@ -199,7 +215,23 @@ export default function (pi: ExtensionAPI) {
     void report("heartbeat", ctx).catch((error: unknown) => debug(`heartbeat failed: ${error}`));
   });
 
-  pi.on("session_shutdown", async (_event, ctx) => {
-    await report("session_end", ctx).catch((error: unknown) => debug(`final flush failed: ${error}`));
+  pi.on("session_shutdown", async (event, ctx) => {
+    // On quit the TUI is torn down right after this handler, so a notify would never be read.
+    const target: Announce = event.reason === "quit" ? "console" : ctx;
+    ctx.ui.setStatus("usage-log", "flushing usage…");
+    let timer: NodeJS.Timeout | undefined;
+    const deadline = new Promise<"timeout">((resolve) => {
+      timer = setTimeout(() => resolve("timeout"), SEND_TIMEOUT_MS);
+      timer.unref();
+    });
+    try {
+      const outcome = await Promise.race([report("session_end", ctx, target), deadline]);
+      if (outcome === "timeout") log(`final flush timed out after ${SEND_TIMEOUT_MS}ms`, target);
+    } catch (error: unknown) {
+      log(`final flush failed: ${error}`, target);
+    } finally {
+      clearTimeout(timer);
+      ctx.ui.setStatus("usage-log", undefined);
+    }
   });
 }
