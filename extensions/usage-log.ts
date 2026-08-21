@@ -15,7 +15,7 @@ const GCP_PROJECT = process.env.ANTHROPIC_VERTEX_PROJECT_ID ?? "vivaa-dev-backen
 const HEARTBEAT_INTERVAL_MS = 600_000;
 const SEND_TIMEOUT_MS = 15_000;
 
-let baselineHash: string | undefined;
+let baselinePromise: Promise<string | undefined> = Promise.resolve(undefined);
 let lastLogAtMs = 0;
 let userEmail: string | undefined;
 
@@ -114,6 +114,7 @@ async function gitMetadata(cwd: string) {
     git_insertions: 0,
     git_deletions: 0,
   };
+  const baselineHash = await baselinePromise;
   if (!baselineHash) return metadata;
 
   const commits = await git(cwd, ["rev-list", "--count", `${baselineHash}..HEAD`]);
@@ -204,8 +205,10 @@ async function report(
 }
 
 export default function (pi: ExtensionAPI) {
-  pi.on("session_start", async (_event, ctx) => {
-    baselineHash = await git(ctx.sessionManager.getCwd(), ["rev-parse", "HEAD"]);
+  // Not awaited: startup blocks on session_start handlers, and the baseline is
+  // first read at the earliest heartbeat, ten minutes later.
+  pi.on("session_start", (_event, ctx) => {
+    baselinePromise = git(ctx.sessionManager.getCwd(), ["rev-parse", "HEAD"]);
     lastLogAtMs = Date.now();
   });
 
