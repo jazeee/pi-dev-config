@@ -21,6 +21,56 @@ apply to every line of code you write.
 - Use `/**` JSDoc for documenting the API of a function, not for explaining why
   the function exists.
 
+## Frontend file organization
+
+- One component per file. Always. No exceptions for "small" helper components,
+  row renderers, dialog bodies, or column definitions.
+- Create a named directory per feature/area and let the path carry the
+  namespace. The filename says what the thing is, the directory says whose it
+  is.
+- Keep the full path non-redundant: `Flows/Definitions/Page.tsx`, not
+  `Flows/Definitions/FlowDefinitionsPage.tsx`.
+- The export name must still be namespaced and never generic. The filename is
+  short because the directory supplies the context; the imported symbol must be
+  unique and self-describing at the call site.
+
+```typescript
+// Flows/Definitions/Page.tsx
+export function FlowDefinitionsPage() {}
+// Flows/Definitions/Table.tsx
+export function FlowDefinitionsTable() {}
+
+import { FlowDefinitionsPage } from './Flows/Definitions/Page';
+
+// Wrong: generic export name
+export function Table() {}
+// Wrong: redundant path segments
+import { FlowDefinitionsPage } from './Flows/Definitions/FlowDefinitionsPage';
+```
+
+- A file reaching ~200 lines is a strong signal it must be split. Split by
+  concern, not by arbitrary line count: page shell, table, row, filters,
+  dialogs, hooks, and types each get their own file.
+- `index.ts` is for barrel exports only; never put logic there.
+- When editing an oversized existing file, extract the part you are touching
+  rather than growing the file further.
+
+Why this matters:
+
+1. Hot module reloading. HMR is more efficient and useful when code lives in
+   separate files. Editing a file resets state within that file but not its
+   parents, so dialogs stay open and forms stay hydrated as you iterate.
+2. Code splitting and lazy loading. The web ecosystem relies on lazy-loadable,
+   code-splittable modules; smaller files mean faster front end load times.
+3. PR review. Isolated files are far easier to review and re-review; once a file
+   is in good shape, GitHub's `Viewed` checkbox keeps attention on the rest.
+   Large files are hard to review at all.
+4. Single concern. Code split by concern is easier to understand, for both
+   humans and AI, and produces smaller, more precise context windows.
+
+The same principles apply to backend code where practical: one route, model,
+controller, or job per file, grouped in named directories.
+
 ## Branches
 
 - Never do work on `main`, and never hold/occupy `main`. Always create your own
