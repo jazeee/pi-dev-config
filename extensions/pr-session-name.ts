@@ -38,17 +38,22 @@ function branch(cwd: string): string | undefined {
 }
 
 export default function (pi: ExtensionAPI) {
+  let prStatus: string | undefined;
+
   const showName = (ctx: ExtensionContext): void => {
     const name = pi.getSessionName();
     if (!ctx.hasUI) return;
-    const label = name ? shorten(name, MAX_STATUS) : undefined;
+    const label = prStatus ?? (name ? shorten(name, MAX_STATUS) : undefined);
     ctx.ui.setWidget(
       "session-name",
       label ? (_tui, theme) => new Text(theme.fg(NAME_COLOR, label), 0, 0) : undefined,
     );
   };
 
-  pi.on("session_start", async (_event, ctx) => showName(ctx));
+  pi.on("session_start", async (_event, ctx) => {
+    prStatus = undefined;
+    showName(ctx);
+  });
   pi.on("session_info_changed", async (_event, ctx) => showName(ctx));
 
   pi.on("before_agent_start", async (event, ctx) => {
@@ -78,6 +83,9 @@ export default function (pi: ExtensionAPI) {
     const [url, , , number] = match;
     const title = prTitle(url, ctx.sessionManager.getCwd());
     const name = title ? `#${number} ${shorten(title)}` : `#${number}`;
+    prStatus = title
+      ? `${url} ${shorten(title, Math.max(10, MAX_STATUS - url.length - 1))}`
+      : url;
     pi.setSessionName(name);
     ctx.ui.notify(`Session named: ${name}`, "info");
   });
