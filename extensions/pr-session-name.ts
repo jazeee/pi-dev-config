@@ -3,7 +3,8 @@ import { isBashToolResult, type ExtensionAPI, type ExtensionContext } from "@ear
 import { Text } from "@earendil-works/pi-tui";
 
 const PR_URL = /https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)/;
-const MAX_TITLE = 60;
+const MAX_TITLE = 40;
+const MAX_STATUS = 80;
 const NAME_COLOR = "accent";
 
 function prTitle(url: string, cwd: string): string | undefined {
@@ -40,9 +41,10 @@ export default function (pi: ExtensionAPI) {
   const showName = (ctx: ExtensionContext): void => {
     const name = pi.getSessionName();
     if (!ctx.hasUI) return;
+    const label = name ? shorten(name, MAX_STATUS) : undefined;
     ctx.ui.setWidget(
       "session-name",
-      name ? (_tui, theme) => new Text(theme.fg(NAME_COLOR, name), 0, 0) : undefined,
+      label ? (_tui, theme) => new Text(theme.fg(NAME_COLOR, label), 0, 0) : undefined,
     );
   };
 
