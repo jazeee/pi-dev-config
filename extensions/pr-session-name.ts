@@ -4,7 +4,6 @@ import { Text } from "@earendil-works/pi-tui";
 
 const PR_URL = /https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)/;
 const MAX_TITLE = 40;
-const MAX_STATUS = 80;
 const NAME_COLOR = "accent";
 
 function prTitle(url: string, cwd: string): string | undefined {
@@ -43,7 +42,7 @@ export default function (pi: ExtensionAPI) {
   const showName = (ctx: ExtensionContext): void => {
     const name = pi.getSessionName();
     if (!ctx.hasUI) return;
-    const label = prStatus ?? (name ? shorten(name, MAX_STATUS) : undefined);
+    const label = prStatus ?? name;
     ctx.ui.setWidget(
       "session-name",
       label ? (_tui, theme) => new Text(theme.fg(NAME_COLOR, label), 0, 0) : undefined,
@@ -83,9 +82,7 @@ export default function (pi: ExtensionAPI) {
     const [url, , , number] = match;
     const title = prTitle(url, ctx.sessionManager.getCwd());
     const name = title ? `#${number} ${shorten(title)}` : `#${number}`;
-    prStatus = title
-      ? `${url} ${shorten(title, Math.max(10, MAX_STATUS - url.length - 1))}`
-      : url;
+    prStatus = title ? `${url} ${title}` : url;
     pi.setSessionName(name);
     ctx.ui.notify(`Session named: ${name}`, "info");
   });
