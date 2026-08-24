@@ -1,10 +1,28 @@
 import { execFileSync } from "node:child_process";
-import { isBashToolResult, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import {
+  isBashToolResult,
+  type ExtensionAPI,
+  type ExtensionContext,
+  type Theme,
+} from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 
 const PR_URL = /https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)/;
+const ANY_URL = /(https?:\/\/\S+)/g;
+const IS_URL = /^https?:\/\//;
 const MAX_TITLE = 40;
-const NAME_COLOR = "accent";
+const NAME_COLOR = "text";
+const URL_COLOR = "mdLinkUrl";
+
+function paint(label: string, theme: Theme): string {
+  return label
+    .split(ANY_URL)
+    .filter((part) => part.length > 0)
+    .map((part) =>
+      IS_URL.test(part) ? theme.bold(theme.fg(URL_COLOR, part)) : theme.fg(NAME_COLOR, part),
+    )
+    .join("");
+}
 
 function prTitle(url: string, cwd: string): string | undefined {
   try {
@@ -45,7 +63,7 @@ export default function (pi: ExtensionAPI) {
     const label = prStatus ?? name;
     ctx.ui.setWidget(
       "session-name",
-      label ? (_tui, theme) => new Text(theme.fg(NAME_COLOR, label), 0, 0) : undefined,
+      label ? (_tui, theme) => new Text(paint(label, theme), 0, 0) : undefined,
     );
   };
 

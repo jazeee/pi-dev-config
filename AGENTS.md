@@ -2,8 +2,8 @@
 
 Most of what follows exists because you are never the only instance of pi
 running: other instances may be working in the same repository at the same time,
-and these rules keep them from colliding. The comment rules are separate, and
-apply to every line of code you write.
+and these rules keep them from colliding. The comment and nullability rules are
+separate, and apply to every line of code you write.
 
 ## Comments
 
@@ -20,6 +20,36 @@ apply to every line of code you write.
   is defined.
 - Use `/**` JSDoc for documenting the API of a function, not for explaining why
   the function exists.
+
+## Nullability
+
+- Test absence with `isDefined`. Never compare against `null` or `undefined`
+  directly, and never lean on a bare truthiness check, which also swallows `0`
+  and `''`.
+- Treat `null` and `undefined` as the same thing: absent. Do not write code
+  that behaves differently for the two, and do not normalize one into the other
+  just to satisfy a check.
+- Flip the condition so the positive case reads as prose. `isDefined(x)` with an
+  early return beats `!isDefined(x)` guarding an else.
+
+```typescript
+// Correct
+if (isDefined(latitude)) {
+}
+return isDefined(message) ? [message] : [];
+
+// Wrong
+if (value !== undefined) {
+}
+if (value != null) {
+}
+return message === undefined ? [] : [message];
+```
+
+The one exception is a contract that gives `null` a meaning distinct from
+absence, such as a PATCH body where `null` clears a property and a missing key
+leaves it alone. There, distinguish them deliberately and say so in a comment,
+because the reader will otherwise assume this rule.
 
 ## Frontend file organization
 
