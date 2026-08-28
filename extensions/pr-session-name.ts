@@ -55,12 +55,13 @@ function branch(cwd: string): string | undefined {
 }
 
 export default function (pi: ExtensionAPI) {
-  let prStatus: string | undefined;
+  // The session name is kept short for lists and pickers; the status shows the untruncated text.
+  let status: string | undefined;
 
   const showName = (ctx: ExtensionContext): void => {
     const name = pi.getSessionName();
     if (!ctx.hasUI) return;
-    const label = prStatus ?? name;
+    const label = status ?? name;
     ctx.ui.setWidget(
       "session-name",
       label ? (_tui, theme) => new Text(paint(label, theme), 0, 0) : undefined,
@@ -68,7 +69,7 @@ export default function (pi: ExtensionAPI) {
   };
 
   pi.on("session_start", async (_event, ctx) => {
-    prStatus = undefined;
+    status = undefined;
     showName(ctx);
   });
   pi.on("session_info_changed", async (_event, ctx) => showName(ctx));
@@ -84,6 +85,7 @@ export default function (pi: ExtensionAPI) {
     const name = head
       ? `${head}: ${shorten(first, Math.max(20, MAX_TITLE - head.length - 2))}`
       : shorten(first);
+    status = head ? `${head}: ${first}` : first;
     pi.setSessionName(name);
   });
 
@@ -100,7 +102,7 @@ export default function (pi: ExtensionAPI) {
     const [url, , , number] = match;
     const title = prTitle(url, ctx.sessionManager.getCwd());
     const name = title ? `#${number} ${shorten(title)}` : `#${number}`;
-    prStatus = title ? `${url} ${title}` : url;
+    status = title ? `${url} ${title}` : url;
     pi.setSessionName(name);
     ctx.ui.notify(`Session named: ${name}`, "info");
   });

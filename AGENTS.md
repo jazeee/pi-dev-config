@@ -51,6 +51,18 @@ absence, such as a PATCH body where `null` clears a property and a missing key
 leaves it alone. There, distinguish them deliberately and say so in a comment,
 because the reader will otherwise assume this rule.
 
+## Colocation
+
+- Inline by default. A single-use constant, derived value, or handler belongs at
+  its point of use, not in a named binding above it.
+- Extract only when the code is used in more than one place **and** is
+  non-trivial. Reuse alone is not enough; neither is complexity alone.
+- Event handlers go inline in JSX, always, even when the logic is long.
+- Reshape data at the source (for example `select` in a query) rather than after
+  the fact.
+- When something must be inlined but needs justification, put a one-line comment
+  above the statement.
+
 ## Frontend file organization
 
 - One component per file. Always. No exceptions for "small" helper components,
